@@ -1,0 +1,11 @@
+/.settings
+
+/wp-admin
+/wp-content/plugins/akismet
+/wp-content/plugins/*.php
+/wp-content/themes
+/wp-content/*.php
+/wp-includes
+/*.php
+/*.txt
+/*.html
