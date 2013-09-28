@@ -158,7 +158,7 @@ class Keyring_Service_PlayGrid extends Keyring_Service_OAuth2 {
 	}
 	
 	function verified_redirect ($url, $service) {
-		return get_edit_profile_url(wp_get_current_user()->ID);
+		return home_url();
 	}
 	
 	function get_display( Keyring_Access_Token $token ) {
