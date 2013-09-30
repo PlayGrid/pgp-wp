@@ -16,6 +16,8 @@ class Keyring_Service_PlayGrid extends Keyring_Service_OAuth2 {
 
 	function __construct() {
 		parent::__construct();
+		
+		$this->callback_url = Keyring_Service_PlayGrid::callback_url( $this->get_name(), array( 'action' => 'verify' ) );
 
 		// Enable "basic" UI for entering key/secret
 		if ( ! KEYRING__HEADLESS_MODE ) {
@@ -24,6 +26,7 @@ class Keyring_Service_PlayGrid extends Keyring_Service_OAuth2 {
 		}
 		
 		// Handle limitation of not allowing us to redirect to a dynamic URL
+		add_action( 'pre_keyring_playgrid_request', array( $this, 'redirect_incoming_request' ) );
 		add_action( 'pre_keyring_playgrid_verify', array( $this, 'redirect_incoming_verify' ) );
 
 		add_action( 'keyring_connection_verified', array( $this, 'connection_verified' ), 10, 3 );
@@ -34,9 +37,6 @@ class Keyring_Service_PlayGrid extends Keyring_Service_OAuth2 {
 		$this->set_endpoint( 'access_token', 'http://local.playgrid.com:8000/o/token/', 'POST' );
 		$this->set_endpoint( 'self',         'http://local.playgrid.com:8000/api/1.1/users/self/',   'GET' );
 
-		// Remove nonces, since they can not be saved in pgp application configuration
-		$this->callback_url = remove_query_arg( array( 'nonce', 'kr_nonce' ), $this->callback_url );
-		
 		$creds = $this->get_credentials();
 		$this->app_id  = $creds['app_id'];
 		$this->key     = $creds['key'];
@@ -49,12 +49,30 @@ class Keyring_Service_PlayGrid extends Keyring_Service_OAuth2 {
 		$this->authorization_parameter = 'access_token';
 
 	}
+	
+	/**
+	 * Get the service callback url
+	 *
+	 * @param string $service Shortname of a specific service.
+	 * @return URL to $service request handler
+	 */
+	static function callback_url( $service = false, $params = array() ) {
+		$url = home_url();
+
+		if ( $service )
+			$url = add_query_arg( array( 'page' =>  $service, 'service' => $service ), $url );
+
+		if ( count( $params ) )
+			$url = add_query_arg( $params, $url );
+
+		return $url;
+	}
 
 	function basic_ui_intro() {
 		echo '<p>' . sprintf( __( "To get started, <a href='http://playgrid.com/developer/clients/register/'>register an OAuth client on PlayGrid</a>. The most important setting is the <strong>OAuth redirect_uri</strong>, which should be set to <code>%s</code>. You can set the other values to whatever you like.", 'keyring' ), Keyring_Util::admin_url( 'playgrid', array( 'action' => 'verify' ) ) ) . '</p>';
 		echo '<p>' . __( "Once you've saved those changes, copy the <strong>CLIENT ID</strong> value into the <strong>API Key</strong> field, and the <strong>CLIENT SECRET</strong> value into the <strong>API Secret</strong> field and click save (you don't need an App ID value for PlayGrid).", 'keyring' ) . '</p>';
 	}
-	
+
 	function _get_credentials() {
 		if ( defined( 'KEYRING__PLAYGRID_ID' ) && defined( 'KEYRING__PLAYGRID_SECRET' ) ) {
 			return array(
@@ -75,13 +93,33 @@ class Keyring_Service_PlayGrid extends Keyring_Service_OAuth2 {
 		}
 	}
 
+	function redirect_incoming_request( $request ) {
+		if ( !isset( $request['kr_nonce'] ) ) {
+			// Fix request from PlayGrid - nonce it and move on.
+			$kr_nonce = wp_create_nonce( 'keyring-request' );
+			$nonce = wp_create_nonce( 'keyring-request-' . $this->get_name() );
+
+			wp_safe_redirect(
+				Keyring_Service_PlayGrid::callback_url(
+					$this->get_name(),
+					array(
+						'action'   => 'request',
+						'kr_nonce' => $kr_nonce,
+						'nonce'    => $nonce,
+					)
+				)
+			);
+			exit;
+		}
+	}
+	
 	function redirect_incoming_verify( $request ) {
 		if ( !isset( $request['kr_nonce'] ) ) {
 			// Fix request from PlayGrid - nonce it and move on.
 			$kr_nonce = wp_create_nonce( 'keyring-verify' );
 			$nonce = wp_create_nonce( 'keyring-verify-' . $this->get_name() );
 			wp_safe_redirect(
-				Keyring_Util::admin_url(
+				Keyring_Service_PlayGrid::callback_url(
 					$this->get_name(),
 					array(
 						'action'   => 'verify',
@@ -123,9 +161,6 @@ class Keyring_Service_PlayGrid extends Keyring_Service_OAuth2 {
 
 	
 	function connection_verified($service, $id, $request_token) {
-		
-		Keyring_Util::debug( '&&&&&&&&&&&&&&&&&&&&' );  // FIXME: Debugging
-
 		$access_token = Keyring::get_token_store()->get_token( array( 'service' => $service, 'id' => $id ) );
 		$email = $access_token->meta['email'];
 
@@ -145,16 +180,11 @@ class Keyring_Service_PlayGrid extends Keyring_Service_OAuth2 {
 			$existing_user = WP_User::get_data_by( 'email', $email );
 			
 		}
-		
 		update_user_meta($existing_user->ID, 'playgrid_token_id', $id);
 		
 		$user = wp_set_current_user( $existing_user->ID, $existing_user->user_nicename );
 		wp_set_auth_cookie( $existing_user->ID );
 		do_action( 'wp_login', $existing_user->ID );
-		
-		Keyring_Util::debug( $user );  // FIXME: Debugging
-		Keyring_Util::debug( '&&&&&&&&&&&&&&&&&&&&' );  // FIXME: Debugging
-	
 	}
 	
 	function verified_redirect ($url, $service) {
@@ -165,7 +195,7 @@ class Keyring_Service_PlayGrid extends Keyring_Service_OAuth2 {
 		return $token->get_meta( 'name' );
 	}
 
-	function test_connection() {                                                // This is actually tested in build_token_meta()
+	function test_connection() { 
 		$res = $this->request( $this->self_url, array( 'method' => $this->self_method ) );
 		if ( !Keyring_Util::is_error( $res ) ) {
 			return true;

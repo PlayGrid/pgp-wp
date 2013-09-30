@@ -136,7 +136,34 @@ class PlayGrid {
 		include ( $this->plugin_path . '/templates/settings.php');
 	}
 	
+	/**
+	 * Request Handler
+	 */
+	function request_handler() {
 
+		if (
+			!empty( $_REQUEST['page'] ) && $_REQUEST['page']
+			&&
+			in_array( $_REQUEST['page'], 'playgrid' )                           // intentionally hardcoded
+			&&
+			!empty( $_REQUEST['service'] )
+			&&
+			in_array( $_REQUEST['service'], array_keys( Keyring::get_registered_services() ) )
+			&&			
+			!empty( $_REQUEST['action'] )
+			&&
+			in_array( $_REQUEST['action'], apply_filters( 'keyring_core_actions', array( 'request', 'verify' ) ) )
+			) {
+			
+			// We have an action here to allow us to do things pre-authorization, just in case
+			do_action( "pre_keyring_{$_REQUEST['service']}_{$_REQUEST['action']}", $_REQUEST );
+				
+			Keyring_Util::debug( "keyring_{$_REQUEST['service']}_{$_REQUEST['action']}" );
+			Keyring_Util::debug( $_GET );
+			do_action( "keyring_{$_REQUEST['service']}_{$_REQUEST['action']}", $_REQUEST );
+		}
+		
+	}
 	
 }
 
