@@ -33,29 +33,52 @@
  * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
  */
 
-define( 'PG__PLUGIN_DIR', plugin_dir_path( __FILE__ ) );
 
-
-require_once (PG__PLUGIN_DIR . '/includes/settings.php');
-// require_once (PG__PLUGIN_DIR . '/includes/services/extended/playgrid.php');  // FIXME: Not working right now
-
-// Setup actions
-add_action('login_form', 'add_playgrid_login');
-
-
-function add_playgrid_login() {
-	include (PG__PLUGIN_DIR . '/templates/login_page.php');
-}
+add_action( 'plugins_loaded', array( PlayGrid::get_instance(), 'plugin_setup' ) );
 
 
 class PlayGrid {
 	
+	/**
+	 * Keyring dependency version
+	 *  
+	 * @type string
+	 */
 	const KEYRING_VERSION   = '1.5'; // Minimum version of Keyring required
 	
+	/**
+	 * Plugin instance
+	 * @see get_instance()
+	 * @type object
+	 */
+	protected static $instance = NULL;
 	
-	function __construct() {
-// 		echo "<H1>PLAYGRID CONSTRUCT</H1>";
-		
+	/**
+	 * Path to this plugin's directory
+	 *
+	 * @type string
+	 */
+	public $plugin_path = '';
+	
+	/**
+	 * Access this plugin's working instance
+	 *
+	 * @wp-hook plugins_loaded
+	 * @return  object of this class
+	 */
+	public static function get_instance() {
+		NULL === self::$instance and self::$instance = new self;
+	
+		return self::$instance;
+	}
+	
+	/**
+	 * Used for regular plugin work.
+	 *
+	 * @wp-hook plugins_loaded
+	 * @return  void
+	 */
+	public function plugin_setup() {
 		// Can't do anything if Keyring is not available.
 		// Prompt user to install Keyring (if they can), and bail
 		if ( !defined( 'KEYRING__VERSION' ) || version_compare( KEYRING__VERSION, static::KEYRING_VERSION, '<' ) ) {
@@ -66,21 +89,54 @@ class PlayGrid {
 			}
 			return false;
 		}
-	
-// 		$kr = Keyring::init();
-// 		$service = Keyring::get_service_by_name('playgrid');
 		
-// 		Keyring_Util::debug( '+++++++++++TESTING' );  // FIXME: Debugging
-// 		Keyring_Util::debug( $service );  // FIXME: Debugging
-// 		Keyring_Util::debug( $service->is_connected() );  // FIXME: Debugging
+		$this->plugin_url    = plugins_url( '/', __FILE__ );
+		$this->plugin_path   = plugin_dir_path( __FILE__ );
 		
-// 		Keyring_Util::connect_to($service->get_name(), 'playgrid_login_form');
+		// // require_once ( $this->plugin_path . '/includes/services/extended/playgrid.php' );  // FIXME: Not working right now
+
+		// Register request handler
+		add_action( 'init', array( $this, 'request_handler'), 100);
 		
-		// 	Keyring_Util::debug( $keyring_request_token );  // FIXME: Debugging
-	
+		// Register actions and filters
+		add_action( 'login_form', array( $this, 'add_playgrid_login' ) );
+		add_action( 'admin_menu', array( $this, 'settings_menu' ) );
+		
 	}
 	
-}
+	/**
+	 * Constructor. Intentionally left empty and public.
+	 *
+	 * @see plugin_setup()
+	 */
+	public function __construct() {}
 
-$pg = new PlayGrid();
+
+	/**
+	 * Add PlayGrid Login
+	 */
+	function add_playgrid_login() {
+		include ( $this->plugin_path . '/templates/login_page.php' );
+	}
+	
+	/**
+	 * Settings Menu
+	 */
+	function settings_menu() {
+		add_options_page('PlayGrid Settings', 'PlayGrid', 'manage_options', 'playgrid_settings', array( $this, 'playgrid_options' ) );
+	}
+	
+	/**
+	 * Options
+	 */
+	function playgrid_options() {
+		if (!current_user_can('manage_options')) {
+			wp_die( __('You do not have sufficient permissions to access this page.'));
+		}
+		include ( $this->plugin_path . '/templates/settings.php');
+	}
+	
+
+	
+}
 
