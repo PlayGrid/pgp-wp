@@ -92,8 +92,9 @@ class PlayGrid {
 		
 		$this->plugin_url    = plugins_url( '/', __FILE__ );
 		$this->plugin_path   = plugin_dir_path( __FILE__ );
-		
-		// // require_once ( $this->plugin_path . '/includes/services/extended/playgrid.php' );  // FIXME: Not working right now
+
+		// includes
+		require_once ( $this->plugin_path . '/includes/services/extended/playgrid.php' );
 
 		// Register request handler
 		add_action( 'init', array( $this, 'request_handler'), 100);
@@ -144,7 +145,7 @@ class PlayGrid {
 		if (
 			!empty( $_REQUEST['page'] ) && $_REQUEST['page']
 			&&
-			in_array( $_REQUEST['page'], 'playgrid' )                           // intentionally hardcoded
+			in_array( $_REQUEST['page'], array( 'playgrid' ) )                           // intentionally hardcoded
 			&&
 			!empty( $_REQUEST['service'] )
 			&&
