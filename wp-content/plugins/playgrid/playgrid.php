@@ -8,8 +8,9 @@
 
 /**
  * Plugin Name: PlayGrid
+ * Depends: Keyring
  * Plugin URI: http://www.playgrid.com/wordpress_plugin
- * Description: Integrate PlayGrid with Wordpress.
+ * Description: Integrate Wordpress and PlayGrid
  * Version: 0.1
  * Author: PlayGrid
  * Author URI: http://www.playgrid.com
@@ -83,9 +84,7 @@ class PlayGrid {
 		// Prompt user to install Keyring (if they can), and bail
 		if ( !defined( 'KEYRING__VERSION' ) || version_compare( KEYRING__VERSION, static::KEYRING_VERSION, '<' ) ) {
 			if ( current_user_can( 'install_plugins' ) ) {
-				add_thickbox();
-				wp_enqueue_script( 'plugin-install' );
-				add_filter( 'admin_notices', array( $this, 'require_keyring' ) );
+				add_action( 'admin_notices', array( $this, 'require_keyring' ) );
 			}
 			return false;
 		}
@@ -111,8 +110,14 @@ class PlayGrid {
 	 * @see plugin_setup()
 	 */
 	public function __construct() {}
-
-
+	
+	/**
+	 * Require Keyring
+	 */
+	function require_keyring() {
+		echo '<div class="error"><p>The <em>Keyring</em> plugin is required by PlayGrid.</p></div>';
+	}
+	
 	/**
 	 * Add PlayGrid Login
 	 */
