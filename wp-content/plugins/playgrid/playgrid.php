@@ -89,6 +89,8 @@ class PlayGrid {
 			return false;
 		}
 		
+		$this->configure();
+		
 		$this->plugin_url    = plugins_url( '/', __FILE__ );
 		$this->plugin_path   = plugin_dir_path( __FILE__ );
 
@@ -100,8 +102,11 @@ class PlayGrid {
 		
 		// Register actions and filters
 		add_action( 'login_form', array( $this, 'add_playgrid_login' ) );
-		add_action( 'admin_menu', array( $this, 'settings_menu' ) );
 		
+		if ( is_admin() ) {
+			add_action( 'admin_menu', array( $this, 'settings_menu' ) );
+			add_action( 'admin_init', array( $this, 'register_settings' ) );
+		}
 	}
 	
 	/**
@@ -117,6 +122,35 @@ class PlayGrid {
 	function require_keyring() {
 		echo '<div class="error"><p>The <em>Keyring</em> plugin is required by PlayGrid.</p></div>';
 	}
+
+	/**
+	 * Configure
+	 */
+	function configure() {
+		
+		defined( 'PLAYGRID__API_URL' ) or define( 'PLAYGRID__API_URL', 'http://api.playgrid.com/' ); 
+		
+		$options = get_option( 'playgrid_options' );
+		
+		if ( empty( $options['app_id'] ) and defined( 'PLAYGRID__APP_ID' ) ) {
+			$options['app_id'] = constant( 'PLAYGRID__APP_ID' ); 
+		}
+		defined( 'PLAYGRID__APP_ID' )     or define( 'PLAYGRID__APP_ID',     $options['app_id'] );
+		defined( 'KEYRING__PLAYGRID_ID' ) or define( 'KEYRING__PLAYGRID_ID', $options['app_id'] );
+		
+		if ( empty( $options['app_secret'] ) and defined( 'PLAYGRID__APP_SECRET' ) ) {
+			$options['app_secret'] = constant( 'PLAYGRID__APP_SECRET' ); 
+		}
+		defined( 'PLAYGRID__APP_SECRET' )     or define( 'PLAYGRID__APP_SECRET',     $options['app_secret'] );
+		defined( 'KEYRING__PLAYGRID_SECRET' ) or define( 'KEYRING__PLAYGRID_SECRET', $options['app_secret'] );
+
+		if ( empty( $options['oauth_url'] ) and defined( 'PLAYGRID__OAUTH_URL' ) ) {
+			$options['oauth_url'] = constant( 'PLAYGRID__OAUTH_URL' ); 
+		}
+		defined( 'PLAYGRID__OAUTH_URL' ) or define( 'PLAYGRID__OAUTH_URL', $options['oauth_url'] );
+		
+		update_option( 'playgrid_options', $options ); 
+	}
 	
 	/**
 	 * Add PlayGrid Login
@@ -129,9 +163,9 @@ class PlayGrid {
 	 * Settings Menu
 	 */
 	function settings_menu() {
-		add_options_page('PlayGrid Settings', 'PlayGrid', 'manage_options', 'playgrid_settings', array( $this, 'playgrid_options' ) );
+		add_options_page('PlayGrid Settings', 'PlayGrid', 'manage_options', 'playgrid_options', array( $this, 'playgrid_options' ) );
 	}
-	
+
 	/**
 	 * Options
 	 */
@@ -139,7 +173,46 @@ class PlayGrid {
 		if (!current_user_can('manage_options')) {
 			wp_die( __('You do not have sufficient permissions to access this page.'));
 		}
-		include ( $this->plugin_path . '/templates/settings.php');
+		include ( $this->plugin_path . '/templates/options.php');
+	}
+	
+	/**
+	 * Register Settings
+	 */
+	function register_settings() {
+		register_setting( 'playgrid_options', 'playgrid_options', array( $this, 'playgrid_options_validate' ) );
+		add_settings_section( 'playgrid_main_options', 'Main Settings', array( $this, 'playgrid_options_main_description'), 'playgrid_options' );
+		add_settings_field('playgrid_options_id', 'Application ID', array( $this, 'playgrid_options_main'), 'playgrid_options', 'playgrid_main_options', array( 'label_for' => 'app_id' ) );
+	}
+	
+	/**
+	 * Options Main Description
+	 */
+	function playgrid_options_main_description() {
+		$url = Keyring_Service_PlayGrid::callback_url( 'playgrid', array( 'action' => 'verify' ) );
+		
+		echo '<p>Go to PlayGrid, create an app, enter callback url below, fill out form below.</p>';
+		echo '<p>Callback URL: <em>' . $url . '</em></p>'; 
+	}
+	
+	/**
+	 * Options Main 	
+	 */
+	function playgrid_options_main() {
+		include ( $this->plugin_path . '/templates/options_main.php');
+	}
+	
+	/**
+	 * Options Validate
+	 */
+	function playgrid_options_validate( $input ) {
+		$options = get_option('playgrid_options');
+		
+		$options['app_id']     = trim($input['app_id']);
+		$options['app_secret'] = trim($input['app_secret']);
+		$options['oauth_url']  = trim($input['oauth_url']);
+		
+		return $options;
 	}
 	
 	/**
@@ -150,7 +223,7 @@ class PlayGrid {
 		if (
 			!empty( $_REQUEST['page'] ) && $_REQUEST['page']
 			&&
-			in_array( $_REQUEST['page'], array( 'playgrid' ) )                           // intentionally hardcoded
+			in_array( $_REQUEST['page'], array( 'playgrid' ) )                  // intentionally hardcoded
 			&&
 			!empty( $_REQUEST['service'] )
 			&&

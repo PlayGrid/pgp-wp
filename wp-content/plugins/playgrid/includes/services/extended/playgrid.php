@@ -37,9 +37,9 @@ class Keyring_Service_PlayGrid extends Keyring_Service_OAuth2 {
 		add_filter( 'keyring_verified_redirect', array( $this, 'verified_redirect' ), 10, 2 );
 
 		
-		$this->set_endpoint( 'authorize',    'http://local.playgrid.com:8000/o/authorize/', 'GET' );
-		$this->set_endpoint( 'access_token', 'http://local.playgrid.com:8000/o/token/', 'POST' );
-		$this->set_endpoint( 'self',         'http://local.playgrid.com:8000/api/1.1/users/self/',   'GET' );
+		$this->set_endpoint( 'authorize',    constant( 'PLAYGRID__OAUTH_URL' ) . 'o/authorize/', 'GET' );
+		$this->set_endpoint( 'access_token', constant( 'PLAYGRID__OAUTH_URL' ) . 'o/token/', 'POST' );
+		$this->set_endpoint( 'self',         constant( 'PLAYGRID__API_URL' ) . 'api/1.1/users/self/', 'GET' );
 
 		$creds = $this->get_credentials();
 		$this->app_id  = $creds['app_id'];
