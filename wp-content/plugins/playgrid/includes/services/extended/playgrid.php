@@ -1,6 +1,13 @@
 <?php
 
 /**
+ * PlayGrid Wordpress Plugin
+ * 
+ * @package PlayGrid
+ * @subpackage OAuth2
+ */
+
+/**
  * PlayGrid service definition for Keyring.
  * http://www.playgrid.com/
  */

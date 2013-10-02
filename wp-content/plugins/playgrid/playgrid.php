@@ -1,4 +1,5 @@
 <?php
+
 /**
  * PlayGrid Wordpress Plugin
  * 
@@ -34,6 +35,48 @@
  * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
  */
 
+/**
+ * The PlayGrid plugin allows you to integrate your Wordpress site with PlayGrid
+ * information and functionality. Features:
+ * 
+ * - User sign-up / authentication using PlayGrid OAuth2 implementation
+ * - Server Status widget 
+ *
+ *
+ * Note: PlayGrid depends on Keyring
+ * @see http://wordpress.org/plugins/keyring/
+ * 
+ *
+ * Template Tags
+ * *************  
+ * 
+ * get_playgrid_button()
+ * 
+ * Returns the rendering for the 'Login with PlayGrid' button. 
+ * 
+ * To use as a template tag:
+ * <?php get_playgrid_button(); ?>
+ * 
+ * @see includes/functions.php 
+ * 
+ *
+ * Configuration Constants 
+ * ***********************
+ * Helpful configuration constants to define in you wp-config.php
+ * 
+ * KEYRING__HEADLESS_MODE
+ * - set to true to disable Keyring's admin interfaces
+ * 
+ * PLAYGRID__APP_ID
+ * - set to PlayGrid applicatin ID 
+ *  
+ * PLAYGRID__APP_SECRET
+ * - set to PlayGrid applicatin secret
+
+ * PLAYGRID__OAUTH_URL
+ * - set to the base url of your PlayGrid site, i.e. http://mygame.playgrid.com/
+ * 
+ */
 
 add_action( 'plugins_loaded', array( PlayGrid::get_instance(), 'plugin_setup' ) );
 
@@ -95,6 +138,7 @@ class PlayGrid {
 		$this->plugin_path   = plugin_dir_path( __FILE__ );
 
 		// includes
+		require_once ( $this->plugin_path . '/includes/functions.php' );
 		require_once ( $this->plugin_path . '/includes/services/extended/playgrid.php' );
 
 		// Register request handler
