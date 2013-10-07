@@ -15,7 +15,7 @@ $options = get_option('playgrid_options');
 </tr>
 <tr valign="top">
 	<th scope="row">
-		<label for="app_secret">Application Secret</label>
+		<label for="app_secret">Site Secret</label>
 	</th>
 	<td>
 		<textarea id='playgrid_app_secret' name='playgrid_options[app_secret]' rows='5' cols='41' type='textarea' ><?= $options['app_secret'] ?></textarea>

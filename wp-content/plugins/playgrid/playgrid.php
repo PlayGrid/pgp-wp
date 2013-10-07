@@ -226,17 +226,14 @@ class PlayGrid {
 	function register_settings() {
 		register_setting( 'playgrid_options', 'playgrid_options', array( $this, 'playgrid_options_validate' ) );
 		add_settings_section( 'playgrid_main_options', 'Main Settings', array( $this, 'playgrid_options_main_description'), 'playgrid_options' );
-		add_settings_field('playgrid_options_id', 'Application ID', array( $this, 'playgrid_options_main'), 'playgrid_options', 'playgrid_main_options', array( 'label_for' => 'app_id' ) );
+		add_settings_field('playgrid_options_id', 'Site ID', array( $this, 'playgrid_options_main'), 'playgrid_options', 'playgrid_main_options', array( 'label_for' => 'app_id' ) );
 	}
 	
 	/**
 	 * Options Main Description
 	 */
 	function playgrid_options_main_description() {
-		$url = Keyring_Service_PlayGrid::callback_url( 'playgrid', array( 'action' => 'verify' ) );
-		
-		echo '<p>Go to PlayGrid, create an app, enter callback url below, fill out form below.</p>';
-		echo '<p>Callback URL: <em>' . $url . '</em></p>'; 
+		include ( $this->plugin_path . '/templates/options_main_description.php' );
 	}
 	
 	/**
