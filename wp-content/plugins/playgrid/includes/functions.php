@@ -21,7 +21,7 @@
  */
 function get_playgrid_button( $echo=true ) {
 
-	$url = Keyring_Service_PlayGrid::callback_url( 'playgrid', array( 'action' => 'request' ) );
+	$url = PlayGrid::callback_url( 'playgrid', array( 'action' => 'request' ) );
 	$button = '<a href="' . $url . '" class="button button-primary button-large">Login with PlayGrid</a>';
 	
 	if ( $echo )
