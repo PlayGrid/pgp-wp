@@ -7,7 +7,7 @@
  * @subpackage Options
  */
 
-$url = Keyring_Service_PlayGrid::callback_url( 'playgrid', array( 'action' => 'verify' ) );
+$url = PlayGrid::callback_url( 'playgrid', array( 'action' => 'verify' ) );
 
 ?>
 

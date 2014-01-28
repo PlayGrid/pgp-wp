@@ -4,216 +4,217 @@
  * PlayGrid Wordpress Plugin
  * 
  * @package PlayGrid
- * @subpackage OAuth2
  */
 
-/**
- * PlayGrid service definition for Keyring.
- * http://www.playgrid.com/
- */
+class Service_PlayGrid {
 
-add_action( 'init', 'load_playgrid_service', 1);
+  private $_authorize_url = '';
+  private $_access_token_url = '';
 
-function load_playgrid_service() {
-	
-// Setup actions
-add_action( 'keyring_load_services', array( 'Keyring_Service_PlayGrid', 'init' ) );
-
+  private $api_url;
+  private $_apikey;
+  private $_apisecret;
+  private $_callbackurl;
+  private $_accesstoken;
 
 
-class Keyring_Service_PlayGrid extends Keyring_Service_OAuth2 {
-	const NAME  = 'playgrid';
-	const LABEL = 'PlayGrid';
+  public function __construct($config) {
 
-	function __construct() {
-		parent::__construct();
-		
-		$this->callback_url = Keyring_Service_PlayGrid::callback_url( $this->get_name(), array( 'action' => 'verify' ) );
+    if (true === is_array($config) && $config["oauth_url"]!=="" && $config["app_id"]!=="" && $config["app_secret"]!==""  ) {
+	      // if you want to access user data
+    		$this->api_url = $config['api_url'];
+			$this->_authorize_url = $config['oauth_url']. 'o/authorize/';
+			$this->_access_token_url = $config['oauth_url']. 'o/token/';
+			$this->_callbackurl = PlayGrid::callback_url( "playgrid", array( 'action' => 'verify' ) );
+		    $this->setApiKey($config['app_id']);
+		    $this->setApiSecret($config['app_secret']);
+    } else {
+      	// class was initialized without config options
+		wp_die(
+			"Login over Playgrid is not configured yet.<br/><br/><a href='".wp_login_url()."'>« Back</a>",
+			"Login Error"
+		);
+    }
+  }
 
-		// Enable "basic" UI for entering key/secret
-		if ( ! KEYRING__HEADLESS_MODE ) {
-			add_action( 'keyring_playgrid_manage_ui', array( $this, 'basic_ui' ) );
-			add_filter( 'keyring_playgrid_basic_ui_intro', array( $this, 'basic_ui_intro' ) );
-		}
-		
-		// Handle limitation of not allowing us to redirect to a dynamic URL
-		add_action( 'pre_keyring_playgrid_request', array( $this, 'redirect_incoming_request' ) );
-		add_action( 'pre_keyring_playgrid_verify', array( $this, 'redirect_incoming_verify' ) );
+  public function getLoginUrl($scope = array('basic')) {
+   
+     return $this->_authorize_url . '?client_id=' . urlencode($this->getApiKey()) . '&redirect_uri=' . urlencode($this->getApiCallback()) . '&response_type=code';
 
-		add_action( 'keyring_connection_verified', array( $this, 'connection_verified' ), 10, 3 );
-		add_filter( 'keyring_verified_redirect', array( $this, 'verified_redirect' ), 10, 2 );
+  }
 
-		
-		$this->set_endpoint( 'authorize',    constant( 'PLAYGRID__OAUTH_URL' ) . 'o/authorize/', 'GET' );
-		$this->set_endpoint( 'access_token', constant( 'PLAYGRID__OAUTH_URL' ) . 'o/token/', 'POST' );
-		$this->set_endpoint( 'self',         constant( 'PLAYGRID__API_URL' ) . 'api/1.1/users/self/', 'GET' );
+  public function getOAuthToken($code, $token = false) {
+    $apiData = array(
+      'grant_type'      => 'authorization_code',
+      'client_id'       => $this->getApiKey(),
+      'client_secret'   => $this->getApiSecret(),
+      'redirect_uri'    => $this->getApiCallback(),
+      'code'            => $code
+    );
+    
+    $result = $this->_makeOAuthCall($apiData);
+    return (false === $token) ? $result : $result["access_token"];
+  }
 
-		$creds = $this->get_credentials();
-		$this->app_id  = $creds['app_id'];
-		$this->key     = $creds['key'];
-		$this->secret  = $creds['secret'];
+  private function _makeCall($function, $auth = false, $params = null, $method = 'GET') {
+    if (false === $auth) {
+      // if the call doesn't requires authentication
+      $authMethod = '?client_id=' . $this->getApiKey();
+    } else {
+      // if the call needs an authenticated user
+      if (true === isset($this->_accesstoken)) {
+        $authMethod = '?access_token=' . $this->getAccessToken();
+      } else {
+      	// access token is missing
+		wp_die(
+			"User Info Request Error : " . $jsonData,
+			"Login Error"
+		);
+      }
+    }
+    
+    if (isset($params) && is_array($params)) {
+      $paramString = '&' . http_build_query($params);
+    } else {
+      $paramString = null;
+    }
+    
+    $apiCall = $this->api_url . $function . $authMethod . (('GET' === $method) ? $paramString : null);
 
-		$this->consumer = new OAuthConsumer( $this->key, $this->secret, $this->callback_url );
-		$this->signature_method = new OAuthSignatureMethod_HMAC_SHA1;
+    $ch = curl_init();
+    curl_setopt($ch, CURLOPT_URL, $apiCall);
+    curl_setopt($ch, CURLOPT_HTTPHEADER, array('Accept: application/json'));
+    curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 5);
+    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+    curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
+    
+    if ('POST' === $method) {
+      curl_setopt($ch, CURLOPT_POST, count($params));
+      curl_setopt($ch, CURLOPT_POSTFIELDS, ltrim($paramString, '&'));
+    } else if ('DELETE' === $method) {
+      curl_setopt($ch, CURLOPT_CUSTOMREQUEST, 'DELETE');
+    }
+    
+    $jsonData = curl_exec($ch);
+    if (false === $jsonData) {
+    	// response returned wasn't JSON formatted.
+      throw new Exception("Error: _makeCall() - cURL error: " . curl_error($ch));
+    }
+    curl_close($ch);
+    
+    return json_decode($jsonData,true);
+  }
 
-		$this->authorization_header    = false; // Send in querystring
-		$this->authorization_parameter = 'access_token';
+  private function _makeOAuthCall($apiData) {
+    $apiHost = $this->_access_token_url;
+    
+    $ch = curl_init();
+    curl_setopt($ch, CURLOPT_URL, $apiHost);
+    curl_setopt($ch, CURLOPT_POST, count($apiData));
+    curl_setopt($ch, CURLOPT_POSTFIELDS, http_build_query($apiData));
+    curl_setopt($ch, CURLOPT_HTTPHEADER, array('Accept: application/json'));
+    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+    curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false); 
+    curl_setopt($ch, CURLOPT_HTTPHEADER, array (
+        "Authorization: Basic " . base64_encode($this->getApiKey() . ":" . $this->getApiSecret()),
+    )); 
+    
+    $jsonData = curl_exec($ch);
 
-	}
-	
-	/**
-	 * Get the service callback url
-	 *
-	 * @param string $service Shortname of a specific service.
-	 * @return URL to $service request handler
-	 */
-	static function callback_url( $service = false, $params = array() ) {
-		$url = home_url();
+    if (false === $jsonData) {
+    	// response returned wasn't JSON formatted.
+		wp_die(
+			"Access Token Request Error : " . $jsonData,
+			"Login Error"
+		);
+    }
+    curl_close($ch);
+    
+    return json_decode($jsonData,true);
+  }
 
-		if ( $service )
-			$url = add_query_arg( array( 'page' =>  $service, 'service' => $service ), $url );
+  public function setAccessToken($data) {
+    (true === is_object($data)) ? $token = $data->access_token : $token = $data;
+    $this->_accesstoken = $token;
+  }
 
-		if ( count( $params ) )
-			$url = add_query_arg( $params, $url );
+  public function getAccessToken() {
+    return $this->_accesstoken;
+  }
 
-		return $url;
-	}
+  public function setApiKey($apiKey) {
+    $this->_apikey = $apiKey;
+  }
 
-	function basic_ui_intro() {
-		echo '<p>' . sprintf( __( "To get started, <a href='http://playgrid.com/developer/clients/register/'>register an OAuth client on PlayGrid</a>. The most important setting is the <strong>OAuth redirect_uri</strong>, which should be set to <code>%s</code>. You can set the other values to whatever you like.", 'keyring' ), Keyring_Util::admin_url( 'playgrid', array( 'action' => 'verify' ) ) ) . '</p>';
-		echo '<p>' . __( "Once you've saved those changes, copy the <strong>CLIENT ID</strong> value into the <strong>API Key</strong> field, and the <strong>CLIENT SECRET</strong> value into the <strong>API Secret</strong> field and click save (you don't need an App ID value for PlayGrid).", 'keyring' ) . '</p>';
-	}
+  public function getApiKey() {
+    return $this->_apikey;
+  }
 
-	function _get_credentials() {
-		if ( defined( 'KEYRING__PLAYGRID_ID' ) && defined( 'KEYRING__PLAYGRID_SECRET' ) ) {
-			return array(
-					'app_id' => constant( 'KEYRING__PLAYGRID_ID' ),
-					'key'    => constant( 'KEYRING__PLAYGRID_ID' ),
-					'secret' => constant( 'KEYRING__PLAYGRID_SECRET' ),
-			);
-		} else {
-			$all = apply_filters( 'keyring_credentials', get_option( 'keyring_credentials' ) );
-			if ( !empty( $all['playgrid'] ) ) {
-				$creds = $all['playgrid'];
-				$creds['app_id'] = $creds['key'];
-				return $creds;
-			}
-	
-			// Return null to allow fall-thru to checking generic constants + DB
-			return null;
-		}
-	}
 
-	function redirect_incoming_request( $request ) {
-		if ( !isset( $request['kr_nonce'] ) ) {
-			// Fix request from PlayGrid - nonce it and move on.
-			$kr_nonce = wp_create_nonce( 'keyring-request' );
-			$nonce = wp_create_nonce( 'keyring-request-' . $this->get_name() );
+  public function setApiSecret($apiSecret) {
+    $this->_apisecret = $apiSecret;
+  }
 
-			wp_safe_redirect(
-				Keyring_Service_PlayGrid::callback_url(
-					$this->get_name(),
-					array(
-						'action'   => 'request',
-						'kr_nonce' => $kr_nonce,
-						'nonce'    => $nonce,
-					)
-				)
-			);
-			exit;
-		}
-	}
-	
-	function redirect_incoming_verify( $request ) {
-		if ( !isset( $request['kr_nonce'] ) ) {
-			// Fix request from PlayGrid - nonce it and move on.
-			$kr_nonce = wp_create_nonce( 'keyring-verify' );
-			$nonce = wp_create_nonce( 'keyring-verify-' . $this->get_name() );
-			wp_safe_redirect(
-				Keyring_Service_PlayGrid::callback_url(
-					$this->get_name(),
-					array(
-						'action'   => 'verify',
-						'kr_nonce' => $kr_nonce,
-						'nonce'    => $nonce,
-						'code'     => $request['code'],                         // Auth code from successful response (maybe)
-						'state'    => $request['state'],                        // state from successful response (maybe)
-					)
-				)
-			);
-			exit;
-		}
-	}
-	
-	function build_token_meta( $token ) {
-		$token = new Keyring_Access_Token( $this->get_name(), $token['access_token'], array() );
-		$this->set_token( $token );
-		
-		$response = $this->request( $this->self_url, array( 'method' => $this->self_method ) );
-		
-		if ( Keyring_Util::is_error( $response ) ) {
-			$meta = array();
-		} else {
-			$user = $response->resources;
-			$meta = array(
-					'uri'         => $user->url,                                // url is unique to pgp
-					'username'    => $user->username,
-					'first_name'  => $user->first_name,
-					'last_name'   => $user->last_name,
-					'email'       => $user->email,
-					'is_active'   => $user->is_active,
-					'last_login'  => $user->last_login,
-					'date_joined' => $user->date_joined,
-			);
-		}
+  public function getApiSecret() {
+    return $this->_apisecret;
+  }
+  
+  public function setApiCallback($apiCallback) {
+    $this->_callbackurl = $apiCallback;
+  }
 
-		return apply_filters( 'keyring_access_token_meta', $meta, 'playgrid', $token, $response, $this );
-	}
+  public function getApiCallback() {
+    return $this->_callbackurl;
+  }
 
-	
-	function connection_verified($service, $id, $request_token) {
-		$access_token = Keyring::get_token_store()->get_token( array( 'service' => $service, 'id' => $id ) );
-		$email = $access_token->meta['email'];
+  public function getUserInfo(){
 
-		$existing_user =  WP_User::get_data_by( 'email', $email );
+  	$request = $this->_makeCall( "users/self/" , true );
+
+  	if( isset( $request["resources"] ) && isset($request["resources"]["email"]) ):
+  		return $request["resources"];
+  	else :
+  		return false;
+  	endif;
+
+  }
+
+  public function loginUser(){
+
+  	  $userinfo = $this->getUserInfo();
+
+  	  if( $userinfo !== false ):
+
+  	  	$existing_user =  WP_User::get_data_by( 'email', $userinfo["email"] );
 		if ( !$existing_user ) {
 			$userdata = new WP_User();                                          // Register a new user
-			$userdata->first_name = $access_token->meta['first_name'];
-			$userdata->last_name = $access_token->meta['last_name'];
-			$userdata->user_email = $access_token->meta['email'];
-			$userdata->user_login = $access_token->meta['username'];
+			$userdata->first_name = $userinfo["first_name"];
+			$userdata->last_name = $userinfo["last_name"];
+			$userdata->user_email =$userinfo["email"];
+			$userdata->user_login = $userinfo["username"];
 			$password = wp_generate_password(16, FALSE);
 			$userdata->user_pass = $password;
 			$res = wp_insert_user($userdata);
 			if(is_wp_error($res)) {
 				// TODO: Do something here
 			}
-			$existing_user = WP_User::get_data_by( 'email', $email );
+			$existing_user = WP_User::get_data_by( 'email', $userinfo["email"] );
 			
 		}
-		update_user_meta($existing_user->ID, 'playgrid_token_id', $id);
 		
 		$user = wp_set_current_user( $existing_user->ID, $existing_user->user_nicename );
 		wp_set_auth_cookie( $existing_user->ID );
 		do_action( 'wp_login', $existing_user->ID );
-	}
-	
-	function verified_redirect ($url, $service) {
-		return home_url();
-	}
-	
-	function get_display( Keyring_Access_Token $token ) {
-		return $token->get_meta( 'name' );
-	}
+		wp_redirect(home_url());
+		exit;
 
-	function test_connection() { 
-		$res = $this->request( $this->self_url, array( 'method' => $this->self_method ) );
-		if ( !Keyring_Util::is_error( $res ) ) {
-			return true;
-		}
+	  else : 
+	  	// no user info were returned from API 
+		wp_die(
+			"Something went wrong... Go back and try again..<br/><br/><a href='".wp_login_url()."'>« Back</a>",
+			"Login Error"
+		);
 
-		return $res;
-	}
+  	  endif;
+  }
 }
-
-} // close load_playgrid_service function

@@ -80,15 +80,9 @@
 
 add_action( 'plugins_loaded', array( PlayGrid::get_instance(), 'plugin_setup' ) );
 
+DEFINE("PLAYGRID_PLUGIN_URL",dirname(__FILE__));
 
 class PlayGrid {
-	
-	/**
-	 * Keyring dependency version
-	 *  
-	 * @type string
-	 */
-	const KEYRING_VERSION   = '1.5'; // Minimum version of Keyring required
 	
 	/**
 	 * Plugin instance
@@ -123,16 +117,6 @@ class PlayGrid {
 	 * @return  void
 	 */
 	public function plugin_setup() {
-		// Can't do anything if Keyring is not available.
-		// Prompt user to install Keyring (if they can), and bail
-		if ( !defined( 'KEYRING__VERSION' ) || version_compare( KEYRING__VERSION, static::KEYRING_VERSION, '<' ) ) {
-			if ( current_user_can( 'install_plugins' ) ) {
-				add_action( 'admin_notices', array( $this, 'require_keyring' ) );
-			}
-			return false;
-		}
-		
-		$this->configure();
 		
 		$this->plugin_url    = plugins_url( '/', __FILE__ );
 		$this->plugin_path   = plugin_dir_path( __FILE__ );
@@ -170,30 +154,25 @@ class PlayGrid {
 	/**
 	 * Configure
 	 */
-	function configure() {
+	function get_config() {
 		
-		defined( 'PLAYGRID__API_URL' ) or define( 'PLAYGRID__API_URL', 'http://api.playgrid.com/' ); 
-		
-		$options = get_option( 'playgrid_options' );
-		
-		if ( empty( $options['app_id'] ) and defined( 'PLAYGRID__APP_ID' ) ) {
-			$options['app_id'] = constant( 'PLAYGRID__APP_ID' ); 
-		}
-		defined( 'PLAYGRID__APP_ID' )     or define( 'PLAYGRID__APP_ID',     $options['app_id'] );
-		defined( 'KEYRING__PLAYGRID_ID' ) or define( 'KEYRING__PLAYGRID_ID', $options['app_id'] );
-		
-		if ( empty( $options['app_secret'] ) and defined( 'PLAYGRID__APP_SECRET' ) ) {
-			$options['app_secret'] = constant( 'PLAYGRID__APP_SECRET' ); 
-		}
-		defined( 'PLAYGRID__APP_SECRET' )     or define( 'PLAYGRID__APP_SECRET',     $options['app_secret'] );
-		defined( 'KEYRING__PLAYGRID_SECRET' ) or define( 'KEYRING__PLAYGRID_SECRET', $options['app_secret'] );
+		$config = get_option( 'playgrid_options' );
 
-		if ( empty( $options['oauth_url'] ) and defined( 'PLAYGRID__OAUTH_URL' ) ) {
-			$options['oauth_url'] = constant( 'PLAYGRID__OAUTH_URL' ); 
-		}
-		defined( 'PLAYGRID__OAUTH_URL' ) or define( 'PLAYGRID__OAUTH_URL', $options['oauth_url'] );
+		if( !is_array( $config ) ) $config = array(
+			"api_url" => "",
+			"app_id" => "",
+			"app_secret" => "",
+			"oauth_url" => ""
+		);
+
+  		$config["api_url"] =  defined( 'PLAYGRID__API_URL' ) ? constant('PLAYGRID__API_URL' ) : "http://api.playgrid.com/api/1.1/";
+
+		defined( 'PLAYGRID__APP_ID' ) && $config['app_id'] = constant("PLAYGRID__APP_ID");
+		defined( 'PLAYGRID__APP_SECRET' ) && $config['app_secret'] = constant("PLAYGRID__APP_SECRET");
+		defined( 'PLAYGRID__OAUTH_URL' )  && $config['oauth_url'] = constant("PLAYGRID__OAUTH_URL");
 		
-		update_option( 'playgrid_options', $options ); 
+		return $config;
+		
 	}
 	
 	/**
@@ -268,21 +247,68 @@ class PlayGrid {
 			&&
 			!empty( $_REQUEST['service'] )
 			&&
-			in_array( $_REQUEST['service'], array_keys( Keyring::get_registered_services() ) )
+			in_array( $_REQUEST['service'], array( "playgrid" ) )
 			&&			
 			!empty( $_REQUEST['action'] )
 			&&
-			in_array( $_REQUEST['action'], apply_filters( 'keyring_core_actions', array( 'request', 'verify' ) ) )
+			in_array( $_REQUEST['action'], array( 'request', 'verify' ) )
 			) {
-			
-			// We have an action here to allow us to do things pre-authorization, just in case
-			do_action( "pre_keyring_{$_REQUEST['service']}_{$_REQUEST['action']}", $_REQUEST );
 				
-			Keyring_Util::debug( "keyring_{$_REQUEST['service']}_{$_REQUEST['action']}" );
-			Keyring_Util::debug( $_GET );
-			do_action( "keyring_{$_REQUEST['service']}_{$_REQUEST['action']}", $_REQUEST );
+				$config = $this->get_config();
+
+				switch( $_REQUEST["action"] ):
+
+					case "request" : 
+
+						$service = new Service_PlayGrid( $config );
+
+						header("Location: ".$service->getLoginUrl());
+						exit;
+
+					break;
+
+					case "verify" :
+
+						$service = new Service_PlayGrid( $config );
+
+						if( isset($_REQUEST["code"] ) ) :
+
+							$token = $service->getOAuthToken( $_REQUEST["code"] , true );
+
+							$service->setAccessToken( $token );
+								
+							$service->loginUser();
+
+						else :
+							// "code" wasn't returned in redirect URL from PlayGrid.com
+							wp_die(
+								"Something went wrong... Go back and try again..<br/><br/><a href='".wp_login_url()."'>« Back</a>",
+								"Login Error"
+							);
+
+							exit;
+
+						endif;
+
+					break;
+
+				endswitch;
+
 		}
 		
+	}
+
+	static function callback_url( $service = false, $params = array() ) {
+
+		$url = home_url();
+
+		if ( $service )
+			$url = add_query_arg( array( 'page' =>  $service, 'service' => $service ), $url );
+
+		if ( count( $params ) )
+			$url = add_query_arg( $params, $url );
+
+		return $url;
 	}
 	
 }
