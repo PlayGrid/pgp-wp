@@ -83,233 +83,228 @@ add_action( 'plugins_loaded', array( PlayGrid::get_instance(), 'plugin_setup' ) 
 DEFINE("PLAYGRID_PLUGIN_URL",dirname(__FILE__));
 
 class PlayGrid {
-	
-	/**
-	 * Plugin instance
-	 * @see get_instance()
-	 * @type object
-	 */
-	protected static $instance = NULL;
-	
-	/**
-	 * Path to this plugin's directory
-	 *
-	 * @type string
-	 */
-	public $plugin_path = '';
-	
-	/**
-	 * Access this plugin's working instance
-	 *
-	 * @wp-hook plugins_loaded
-	 * @return  object of this class
-	 */
-	public static function get_instance() {
-		NULL === self::$instance and self::$instance = new self;
-	
-		return self::$instance;
-	}
-	
-	/**
-	 * Used for regular plugin work.
-	 *
-	 * @wp-hook plugins_loaded
-	 * @return  void
-	 */
-	public function plugin_setup() {
-		
-		$this->plugin_url    = plugins_url( '/', __FILE__ );
-		$this->plugin_path   = plugin_dir_path( __FILE__ );
+  
+  /**
+   * Plugin instance
+   * @see get_instance()
+   * @type object
+   */
+  protected static $instance = NULL;
+  
+  /**
+   * Path to this plugin's directory
+   *
+   * @type string
+   */
+  public $plugin_path = '';
+  
+  /**
+   * Access this plugin's working instance
+   *
+   * @wp-hook plugins_loaded
+   * @return  object of this class
+   */
+  public static function get_instance() {
+    NULL === self::$instance and self::$instance = new self;
 
-		// includes
-		require_once ( $this->plugin_path . '/includes/functions.php' );
-		require_once ( $this->plugin_path . '/includes/services/extended/playgrid.php' );
+    return self::$instance;
+  }
 
-		// Register request handler
-		add_action( 'init', array( $this, 'request_handler'), 100);
-		
-		// Register actions and filters
-		add_action( 'login_form', array( $this, 'add_playgrid_login' ) );
-		
-		if ( is_admin() ) {
-			add_action( 'admin_menu', array( $this, 'settings_menu' ) );
-			add_action( 'admin_init', array( $this, 'register_settings' ) );
-		}
-	}
-	
-	/**
-	 * Constructor. Intentionally left empty and public.
-	 *
-	 * @see plugin_setup()
-	 */
-	public function __construct() {}
-	
-	/**
-	 * Require Keyring
-	 */
-	function require_keyring() {
-		echo '<div class="error"><p>The <em>Keyring</em> plugin is required by PlayGrid.</p></div>';
-	}
+  /**
+   * Used for regular plugin work.
+   *
+   * @wp-hook plugins_loaded
+   * @return  void
+   */
+  public function plugin_setup() {
 
-	/**
-	 * Configure
-	 */
-	function get_config() {
-		
-		$config = get_option( 'playgrid_options' );
+    $this->plugin_url    = plugins_url( '/', __FILE__ );
+    $this->plugin_path   = plugin_dir_path( __FILE__ );
 
-		if( !is_array( $config ) ) $config = array(
-			"api_url" => "",
-			"app_id" => "",
-			"app_secret" => "",
-			"oauth_url" => ""
-		);
+    // includes
+    require_once ( $this->plugin_path . '/includes/functions.php' );
+    require_once ( $this->plugin_path . '/includes/services/extended/playgrid.php' );
 
-  		$config["api_url"] =  defined( 'PLAYGRID__API_URL' ) ? constant('PLAYGRID__API_URL' ) : "http://api.playgrid.com/api/1.1/";
+    // Register request handler
+    add_action( 'init', array( $this, 'request_handler'), 100);
 
-		defined( 'PLAYGRID__APP_ID' ) && $config['app_id'] = constant("PLAYGRID__APP_ID");
-		defined( 'PLAYGRID__APP_SECRET' ) && $config['app_secret'] = constant("PLAYGRID__APP_SECRET");
-		defined( 'PLAYGRID__OAUTH_URL' )  && $config['oauth_url'] = constant("PLAYGRID__OAUTH_URL");
-		
-		return $config;
-		
-	}
-	
-	/**
-	 * Add PlayGrid Login
-	 */
-	function add_playgrid_login() {
-		include ( $this->plugin_path . '/templates/login_page.php' );
-	}
-	
-	/**
-	 * Settings Menu
-	 */
-	function settings_menu() {
-		add_options_page('PlayGrid Settings', 'PlayGrid', 'manage_options', 'playgrid_options', array( $this, 'playgrid_options' ) );
-	}
+    // Register actions and filters
+    add_action( 'login_form', array( $this, 'add_playgrid_login' ) );
 
-	/**
-	 * Options
-	 */
-	function playgrid_options() {
-		if (!current_user_can('manage_options')) {
-			wp_die( __('You do not have sufficient permissions to access this page.'));
-		}
-		include ( $this->plugin_path . '/templates/options.php');
-	}
-	
-	/**
-	 * Register Settings
-	 */
-	function register_settings() {
-		register_setting( 'playgrid_options', 'playgrid_options', array( $this, 'playgrid_options_validate' ) );
-		add_settings_section( 'playgrid_main_options', 'Main Settings', array( $this, 'playgrid_options_main_description'), 'playgrid_options' );
-		add_settings_field('playgrid_options_id', 'Site ID', array( $this, 'playgrid_options_main'), 'playgrid_options', 'playgrid_main_options', array( 'label_for' => 'app_id' ) );
-	}
-	
-	/**
-	 * Options Main Description
-	 */
-	function playgrid_options_main_description() {
-		include ( $this->plugin_path . '/templates/options_main_description.php' );
-	}
-	
-	/**
-	 * Options Main 	
-	 */
-	function playgrid_options_main() {
-		include ( $this->plugin_path . '/templates/options_main.php');
-	}
-	
-	/**
-	 * Options Validate
-	 */
-	function playgrid_options_validate( $input ) {
-		$options = get_option('playgrid_options');
-		
-		$options['app_id']     = trim($input['app_id']);
-		$options['app_secret'] = trim($input['app_secret']);
-		$options['oauth_url']  = trim($input['oauth_url']);
-		
-		return $options;
-	}
-	
-	/**
-	 * Request Handler
-	 */
-	function request_handler() {
+    if ( is_admin() ) {
+      add_action( 'admin_menu', array( $this, 'settings_menu' ) );
+      add_action( 'admin_init', array( $this, 'register_settings' ) );
+    }
+  }
 
-		if (
-			!empty( $_REQUEST['page'] ) && $_REQUEST['page']
-			&&
-			in_array( $_REQUEST['page'], array( 'playgrid' ) )                  // intentionally hardcoded
-			&&
-			!empty( $_REQUEST['service'] )
-			&&
-			in_array( $_REQUEST['service'], array( "playgrid" ) )
-			&&			
-			!empty( $_REQUEST['action'] )
-			&&
-			in_array( $_REQUEST['action'], array( 'request', 'verify' ) )
-			) {
-				
-				$config = $this->get_config();
+  /**
+   * Constructor. Intentionally left empty and public.
+   *
+   * @see plugin_setup()
+   */
+  public function __construct() {}
 
-				switch( $_REQUEST["action"] ):
+  /**
+   * Require Keyring
+   */
+  function require_keyring() {
+    echo '<div class="error"><p>The <em>Keyring</em> plugin is required by PlayGrid.</p></div>';
+  }
 
-					case "request" : 
+  /**
+   * Configure
+   */
+  function get_config() {
 
-						$service = new Service_PlayGrid( $config );
+    $config = get_option( 'playgrid_options' );
 
-						header("Location: ".$service->getLoginUrl());
-						exit;
+    if( !is_array( $config ) ) $config = array(
+      "api_url" => "",
+      "app_id" => "",
+      "app_secret" => "",
+      "oauth_url" => ""
+    );
 
-					break;
+    $config["api_url"] =  defined( 'PLAYGRID__API_URL' ) ? constant('PLAYGRID__API_URL' ) : "http://api.playgrid.com/api/1.1/";
 
-					case "verify" :
+    defined( 'PLAYGRID__APP_ID' ) && $config['app_id'] = constant("PLAYGRID__APP_ID");
+    defined( 'PLAYGRID__APP_SECRET' ) && $config['app_secret'] = constant("PLAYGRID__APP_SECRET");
+    defined( 'PLAYGRID__OAUTH_URL' )  && $config['oauth_url'] = constant("PLAYGRID__OAUTH_URL");
 
-						$service = new Service_PlayGrid( $config );
+    return $config;
 
-						if( isset($_REQUEST["code"] ) ) :
+  }
 
-							$token = $service->getOAuthToken( $_REQUEST["code"] , true );
+  /**
+   * Add PlayGrid Login
+   */
+  function add_playgrid_login() {
+    include ( $this->plugin_path . '/templates/login_page.php' );
+  }
+  
+  /**
+   * Settings Menu
+   */
+  function settings_menu() {
+    add_options_page('PlayGrid Settings', 'PlayGrid', 'manage_options', 'playgrid_options', array( $this, 'playgrid_options' ) );
+  }
+  
+  /**
+   * Options
+   */
+  function playgrid_options() {
+    if (!current_user_can('manage_options')) {
+      wp_die( __('You do not have sufficient permissions to access this page.'));
+    }
+    include ( $this->plugin_path . '/templates/options.php');
+  }
+  
+  /**
+   * Register Settings
+   */
+  function register_settings() {
+    register_setting( 'playgrid_options', 'playgrid_options', array( $this, 'playgrid_options_validate' ) );
+    add_settings_section( 'playgrid_main_options', 'Main Settings', array( $this, 'playgrid_options_main_description'), 'playgrid_options' );
+    add_settings_field('playgrid_options_id', 'Site ID', array( $this, 'playgrid_options_main'), 'playgrid_options', 'playgrid_main_options', array( 'label_for' => 'app_id' ) );
+  }
+  
+  /**
+   * Options Main Description
+   */
+  function playgrid_options_main_description() {
+  	include ( $this->plugin_path . '/templates/options_main_description.php' );
+  }
+  
+  /**
+   * Options Main 	
+   */
+  function playgrid_options_main() {
+  	include ( $this->plugin_path . '/templates/options_main.php');
+  }
+  
+  /**
+   * Options Validate
+   */
+  function playgrid_options_validate( $input ) {
+    $options = get_option('playgrid_options');
 
-							$service->setAccessToken( $token );
-								
-							$service->loginUser();
+    $options['app_id']     = trim($input['app_id']);
+    $options['app_secret'] = trim($input['app_secret']);
+    $options['oauth_url']  = trim($input['oauth_url']);
 
-						else :
-							// "code" wasn't returned in redirect URL from PlayGrid.com
-							wp_die(
-								"Something went wrong... Go back and try again..<br/><br/><a href='".wp_login_url()."'>« Back</a>",
-								"Login Error"
-							);
+    return $options;
+  }
 
-							exit;
+  /**
+   * Request Handler
+   */
+  function request_handler() {
 
-						endif;
+    if (
+      !empty( $_REQUEST['page'] ) && $_REQUEST['page']
+      &&
+      in_array( $_REQUEST['page'], array( 'playgrid' ) )                        // intentionally hardcoded
+      &&
+      !empty( $_REQUEST['service'] )
+      &&
+      in_array( $_REQUEST['service'], array( "playgrid" ) )
+      &&			
+      !empty( $_REQUEST['action'] )
+      &&
+      in_array( $_REQUEST['action'], array( 'request', 'verify' ) )
+      ) {
 
-					break;
+        $config = $this->get_config();
 
-				endswitch;
+        switch( $_REQUEST["action"] ):
 
-		}
-		
-	}
+          case "request" : 
 
-	static function callback_url( $service = false, $params = array() ) {
+            $service = new Service_PlayGrid( $config );
 
-		$url = home_url();
+            header("Location: ".$service->getLoginUrl());
+            exit;
 
-		if ( $service )
-			$url = add_query_arg( array( 'page' =>  $service, 'service' => $service ), $url );
+          break;
 
-		if ( count( $params ) )
-			$url = add_query_arg( $params, $url );
+          case "verify" :
 
-		return $url;
-	}
-	
+            $service = new Service_PlayGrid( $config );
+
+            if( isset($_REQUEST["code"] ) ) :
+
+              $token = $service->getOAuthToken( $_REQUEST["code"] , true );
+
+              $service->setAccessToken( $token );
+
+              $service->loginUser();
+
+            else :
+
+              exit;
+
+            endif;
+
+          break;
+
+        endswitch;
+
+    }
+
+  }
+
+  static function callback_url( $service = false, $params = array() ) {
+
+    $url = home_url();
+
+    if ( $service )
+      $url = add_query_arg( array( 'page' =>  $service, 'service' => $service ), $url );
+
+    if ( count( $params ) )
+      $url = add_query_arg( $params, $url );
+
+    return $url;
+  }
+
 }
 

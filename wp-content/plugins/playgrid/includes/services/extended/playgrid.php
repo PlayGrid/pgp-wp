@@ -21,13 +21,13 @@ class Service_PlayGrid {
   public function __construct($config) {
 
     if (true === is_array($config) && $config["oauth_url"]!=="" && $config["app_id"]!=="" && $config["app_secret"]!==""  ) {
-	      // if you want to access user data
-    		$this->api_url = $config['api_url'];
-			$this->_authorize_url = $config['oauth_url']. 'o/authorize/';
-			$this->_access_token_url = $config['oauth_url']. 'o/token/';
-			$this->_callbackurl = PlayGrid::callback_url( "playgrid", array( 'action' => 'verify' ) );
-		    $this->setApiKey($config['app_id']);
-		    $this->setApiSecret($config['app_secret']);
+      // if you want to access user data
+      $this->api_url = $config['api_url'];
+      $this->_authorize_url = $config['oauth_url']. 'o/authorize/';
+      $this->_access_token_url = $config['oauth_url']. 'o/token/';
+      $this->_callbackurl = PlayGrid::callback_url( "playgrid", array( 'action' => 'verify' ) );
+      $this->setApiKey($config['app_id']);
+      $this->setApiSecret($config['app_secret']);
     } else {
       	// class was initialized without config options
 		wp_die(
@@ -39,7 +39,7 @@ class Service_PlayGrid {
 
   public function getLoginUrl($scope = array('basic')) {
    
-     return $this->_authorize_url . '?client_id=' . urlencode($this->getApiKey()) . '&redirect_uri=' . urlencode($this->getApiCallback()) . '&response_type=code';
+    return $this->_authorize_url . '?client_id=' . urlencode($this->getApiKey()) . '&redirect_uri=' . urlencode($this->getApiCallback()) . '&response_type=code';
 
   }
 
@@ -97,7 +97,7 @@ class Service_PlayGrid {
     
     $jsonData = curl_exec($ch);
     if (false === $jsonData) {
-    	// response returned wasn't JSON formatted.
+      // response returned wasn't JSON formatted.
       throw new Exception("Error: _makeCall() - cURL error: " . curl_error($ch));
     }
     curl_close($ch);
@@ -116,7 +116,7 @@ class Service_PlayGrid {
     curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
     curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false); 
     curl_setopt($ch, CURLOPT_HTTPHEADER, array (
-        "Authorization: Basic " . base64_encode($this->getApiKey() . ":" . $this->getApiSecret()),
+      "Authorization: Basic " . base64_encode($this->getApiKey() . ":" . $this->getApiSecret()),
     )); 
     
     $jsonData = curl_exec($ch);
@@ -169,52 +169,49 @@ class Service_PlayGrid {
 
   public function getUserInfo(){
 
-  	$request = $this->_makeCall( "users/self/" , true );
+    $request = $this->_makeCall( "users/self/" , true );
 
-  	if( isset( $request["resources"] ) && isset($request["resources"]["email"]) ):
-  		return $request["resources"];
-  	else :
-  		return false;
-  	endif;
+    if( isset( $request["resources"] ) && isset($request["resources"]["email"]) ):
+      return $request["resources"];
+    else :
+      return false;
+    endif;
 
   }
 
   public function loginUser(){
 
-  	  $userinfo = $this->getUserInfo();
+      $userinfo = $this->getUserInfo();
+      if( $userinfo !== false ):
 
-  	  if( $userinfo !== false ):
+        $existing_user =  WP_User::get_data_by( 'email', $userinfo["email"] );
+        if ( !$existing_user ) {
 
-  	  	$existing_user =  WP_User::get_data_by( 'email', $userinfo["email"] );
-		if ( !$existing_user ) {
-			$userdata = new WP_User();                                          // Register a new user
-			$userdata->first_name = $userinfo["first_name"];
-			$userdata->last_name = $userinfo["last_name"];
-			$userdata->user_email =$userinfo["email"];
-			$userdata->user_login = $userinfo["username"];
-			$password = wp_generate_password(16, FALSE);
-			$userdata->user_pass = $password;
-			$res = wp_insert_user($userdata);
-			if(is_wp_error($res)) {
-				// TODO: Do something here
-			}
-			$existing_user = WP_User::get_data_by( 'email', $userinfo["email"] );
-			
-		}
-		
-		$user = wp_set_current_user( $existing_user->ID, $existing_user->user_nicename );
-		wp_set_auth_cookie( $existing_user->ID );
-		do_action( 'wp_login', $existing_user->ID );
-		wp_redirect(home_url());
-		exit;
+          $password = wp_generate_password(16, FALSE);
 
-	  else : 
-	  	// no user info were returned from API 
-		wp_die(
-			"Something went wrong... Go back and try again..<br/><br/><a href='".wp_login_url()."'>« Back</a>",
-			"Login Error"
-		);
+          $userdata = new WP_User();                                            // Register a new user
+          $userdata->first_name = $userinfo["first_name"];
+          $userdata->last_name = $userinfo["last_name"];
+          $userdata->user_email =$userinfo["email"];
+          $userdata->user_login = $userinfo["username"];
+          $userdata->user_pass = $password;
+          
+          $res = wp_insert_user($userdata);
+          
+          if(is_wp_error($res)) {
+          }
+          $existing_user = WP_User::get_data_by( 'email', $userinfo["email"] );
+          
+        }
+        
+        $user = wp_set_current_user( $existing_user->ID, $existing_user->user_nicename );
+        wp_set_auth_cookie( $existing_user->ID );
+        do_action( 'wp_login', $existing_user->ID );
+        wp_redirect(home_url());
+        exit;
 
-  	  endif;
+      else : 
+      
+      endif;
   }
 }
