@@ -150,7 +150,7 @@ class PlayGrid {
       "oauth_url" => ""
     );
 
-    $config["api_url"] =  defined( 'PLAYGRID__API_URL' ) ? constant('PLAYGRID__API_URL' ) : "http://api.playgrid.com/api/1.1/";
+    $config["api_url"] =  defined( 'PLAYGRID__API_URL' ) ? constant('PLAYGRID__API_URL' ) : "http://api.playgrid.com/";
 
     defined( 'PLAYGRID__APP_ID' ) && $config['app_id'] = constant("PLAYGRID__APP_ID");
     defined( 'PLAYGRID__APP_SECRET' ) && $config['app_secret'] = constant("PLAYGRID__APP_SECRET");

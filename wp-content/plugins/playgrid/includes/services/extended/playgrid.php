@@ -169,7 +169,7 @@ class Service_PlayGrid {
 
   public function getUserInfo(){
 
-    $request = $this->_makeCall( "users/self/" , true );
+    $request = $this->_makeCall( "api/1.1/users/self/" , true );
 
     if( isset( $request["resources"] ) && isset($request["resources"]["email"]) ):
       return $request["resources"];
