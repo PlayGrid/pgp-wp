@@ -29,11 +29,11 @@ class Service_PlayGrid {
       $this->setApiKey($config['app_id']);
       $this->setApiSecret($config['app_secret']);
     } else {
-      	// class was initialized without config options
-		wp_die(
-			"Login over Playgrid is not configured yet.<br/><br/><a href='".wp_login_url()."'>« Back</a>",
-			"Login Error"
-		);
+      // class was initialized without config options
+      wp_die(
+        "The PlayGrid plugin is not configured.<br/><br/><a href='".admin_url("options-general.php?page=playgrid_options")."'>Configure PlayGrid now.</a>",
+        "Confirguration Error"
+      );
     }
   }
 
@@ -65,11 +65,11 @@ class Service_PlayGrid {
       if (true === isset($this->_accesstoken)) {
         $authMethod = '?access_token=' . $this->getAccessToken();
       } else {
-      	// access token is missing
-		wp_die(
-			"User Info Request Error : " . $jsonData,
-			"Login Error"
-		);
+        // access token is missing
+        wp_die(
+          "Access token required.",
+          "Authentication Error"
+        );
       }
     }
     
@@ -122,11 +122,11 @@ class Service_PlayGrid {
     $jsonData = curl_exec($ch);
 
     if (false === $jsonData) {
-    	// response returned wasn't JSON formatted.
-		wp_die(
-			"Access Token Request Error : " . $jsonData,
-			"Login Error"
-		);
+      // response returned wasn't JSON formatted.
+      wp_die(
+        "Access Token Request Error: " . $jsonData,
+        "Access Token Error"
+      );
     }
     curl_close($ch);
     
@@ -199,11 +199,15 @@ class Service_PlayGrid {
           $res = wp_insert_user($userdata);
           
           if(is_wp_error($res)) {
+            wp_die(
+              "Unable to create a Wordpress user. Please try again. <br/><br/><a href='".wp_login_url()."'>&laquo; Back</a>", 
+              "Authentication Error"
+            );
           }
           $existing_user = WP_User::get_data_by( 'email', $userinfo["email"] );
-          
+
         }
-        
+
         $user = wp_set_current_user( $existing_user->ID, $existing_user->user_nicename );
         wp_set_auth_cookie( $existing_user->ID );
         do_action( 'wp_login', $existing_user->ID );
@@ -211,6 +215,11 @@ class Service_PlayGrid {
         exit;
 
       else : 
+        // no user info were returned from API 
+        wp_die(
+          "Unable to authenticate with PlayGrid at this time. Please try again. <br/><br/><a href='".wp_login_url()."'>&laquo; Back</a>",
+          "Authentication Error"
+        );
       
       endif;
   }

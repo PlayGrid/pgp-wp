@@ -280,6 +280,11 @@ class PlayGrid {
               $service->loginUser();
 
             else :
+              // "code" wasn't returned in redirect URL from PlayGrid.com
+              wp_die(
+                "Unable to verify your request at this time. Please try again. <br/><br/><a href='".wp_login_url()."'>&laquo; Back</a>",
+                "Verification Error"
+              );
 
               exit;
 
