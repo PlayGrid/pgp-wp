@@ -9,7 +9,6 @@
 
 /**
  * Plugin Name: PlayGrid
- * Depends: Keyring
  * Plugin URI: http://www.playgrid.com/wordpress_plugin
  * Description: Integrate Wordpress and PlayGrid
  * Version: 0.1
@@ -43,10 +42,6 @@
  * - Server Status widget 
  *
  *
- * Note: PlayGrid depends on Keyring
- * @see http://wordpress.org/plugins/keyring/
- * 
- *
  * Template Tags
  * *************  
  * 
@@ -63,9 +58,6 @@
  * Configuration Constants 
  * ***********************
  * Helpful configuration constants to define in you wp-config.php
- * 
- * KEYRING__HEADLESS_MODE
- * - set to true to disable Keyring's admin interfaces
  * 
  * PLAYGRID__APP_ID
  * - set to PlayGrid applicatin ID 
@@ -143,13 +135,6 @@ class PlayGrid {
    * @see plugin_setup()
    */
   public function __construct() {}
-
-  /**
-   * Require Keyring
-   */
-  function require_keyring() {
-    echo '<div class="error"><p>The <em>Keyring</em> plugin is required by PlayGrid.</p></div>';
-  }
 
   /**
    * Configure

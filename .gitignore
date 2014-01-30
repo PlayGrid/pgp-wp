@@ -2,8 +2,6 @@
 
 /wp-admin
 /wp-content/plugins/akismet
-/wp-content/plugins/keyring
-!/wp-content/plugins/keyring/includes/services/extended/playgrid.php
 /wp-content/plugins/*.php
 /wp-content/themes
 /wp-content/*.php
