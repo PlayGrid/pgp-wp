@@ -189,15 +189,15 @@ class Service_PlayGrid {
 
           $password = wp_generate_password(16, FALSE);
 
-          $userdata = new WP_User();                                            // Register a new user
-          $userdata->first_name = $userinfo["first_name"];
-          $userdata->last_name = $userinfo["last_name"];
-          $userdata->user_email =$userinfo["email"];
-          $userdata->user_login = $userinfo["username"];
-          $userdata->user_pass = $password;
-          
+          $userdata = array();                                                  // Register a new user
+          $userdata["first_name"] = $userinfo["first_name"];
+          $userdata["last_name"]  = $userinfo["last_name"];
+          $userdata["user_email"] = $userinfo["email"];
+          $userdata["user_login"] = $userinfo["username"];
+          $userdata["user_pass"]  = $password;
+
           $res = wp_insert_user($userdata);
-          
+
           if(is_wp_error($res)) {
             wp_die(
               "Unable to create a Wordpress user. Please try again. <br/><br/><a href='".wp_login_url()."'>&laquo; Back</a>", 
